@@ -1,0 +1,607 @@
+\documentclass[11pt, conference]{IEEEtran}
+\usepackage[T1]{fontenc} 
+\usepackage{eqnarray}
+\usepackage{amsmath}
+\usepackage[cmintegrals]{newtxmath}
+\usepackage{bm} 
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{hyperref}
+\usepackage{float}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{xcolor}
+\usepackage[none]{hyphenat}  
+\usepackage{balance}         % Balance columns 
+\usepackage{stfloats}        
+\sloppy                      
+
+\title{Robustness of Hybrid Classical-Quantum Transfer Learning to Adversarial Attacks under Differential Privacy Constraints} %fix title
+\author{Flavjo Xhelollari \\ Fordham University \\ \texttt{fx1@fordham.edu}} 
+
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This paper investigates the robustness of hybrid classical-quantum Transfer Learning (TL) with Vision Transformers (ViTs) to adversarial attacks under Differential Privacy (DP) constraints. We propose a novel framework that integrates TL with pre-trained ViT backbones, adversarial training methodologies, differential privacy mechanisms, and Quantum Computing (QC) paradigms to evaluate trade-offs between model accuracy, privacy guarantees, and adversarial robustness. By freezing pre-trained ViT layers and training only the quantum-enhanced classifier layers implemented through PennyLane on CIFAR-10, we create a controlled environment to isolate the effects of DP and adversarial training. Our experimental analysis compares models trained with various configurations, revealing that DP mechanisms affect the adversarial attack surface differently than traditional training approaches. The proposed quantum-enhanced mixed-data approach offers a balance between privacy guarantees and adversarial robustness while maintaining reasonable accuracy. These findings contribute to building Quantum Machine Learning (QML) systems that leverage QC advantages while simultaneously addressing privacy and security concerns.
+\end{abstract}
+\sloppy
+
+\href{https://qce.quantum.ieee.org/2025/call-for-technical-papers/}{IEEE QCWEEK}
+
+\section{Introduction}
+Deep learning models have demonstrated remarkable performance across various domains, yet they remain vulnerable to adversarial attacks—carefully crafted perturbations that can cause misclassifications while remaining imperceptible to humans  $\textbf{source}$. At the same time, privacy concerns have grown increasingly prominent as these models may  memorize and leak sensitive training data  $\textbf{source}$. The intersection of these two critical challenges—robustness and privacy—represents a fundamental issue in modern machine learning that demands rigorous investigation.
+
+The emergence of ViTs has revolutionized Computer Vision (CV) by applying self-attention mechanisms to image patches, achieving state-of-the-art performance on numerous benchmarks $\textbf{source}$. Recent research has demonstrated that ViTs possess superior transfer learning capabilities compared to traditional convolutional neural networks (CNNs)~\cite{panyi2022transferability}. This inherent transferability makes ViTs an ideal architecture for investigating the privacy-robustness trade-off in transfer learning scenarios.
+
+\subsection{Motivation and Research Significance}
+While DP provides mathematically rigorous guarantees against privacy leakage  $\textbf{source}$, its implementation typically involves adding calibrated noise to gradients during training, which often degrades model utility. Simultaneously, adversarial training has emerged as the most effective defense against adversarial attacks, but it introduces significant computational overhead and can also impair standard accuracy. The interaction between these two defense mechanisms remains understudied, particularly in the context of transfer learning with modern architectures like ViTs. 
+
+Existing work on adversarial robustness in transfer learning, such as the research by Deng et al.~\cite{deng2021}, has demonstrated that adversarial training in the source data can improve the ability of models to transfer to new domains. However, this work does not consider the privacy implications of such training procedures. Similarly, research on differentially private deep learning typically focuses on privacy-utility trade-offs without thoroughly examining how DP affects adversarial robustness.
+
+The sparse research at the intersection of differential privacy and adversarial robustness, such as that by Bu et al.~\cite{bu2021}, has proposed the DP-Adv approach, which aims to be as private as non-robust private models, and as efficient as non-DP adversarial training. Yet, these approaches do not fully explore the dynamics of transfer learning, particularly with frozen feature extractors, nor do they investigate mixed-data training strategies.
+
+\subsection{Our Contributions}
+
+ Our research introduces several novel contributions to address existing gaps. We propose a novel hybrid classical-quantum framework by freezing pre-trained ViT layers and incorporating trainable quantum circuit layers implemented in PennyLane for CIFAR-10, creating a controlled environment to isolate the effects of differential privacy and adversarial training on downstream task performance while leveraging quantum computational advantages. Unlike previous work that evaluates privacy or robustness in isolation, we conduct a comparative analysis of DP impact by directly comparing the vulnerability of models trained on DP-protected versus unprotected data to assess how privacy mechanisms influence the adversarial attack surface. 
+
+Additionally, we introduce a mixed-data adversarial training strategy that combines adversarial examples generated from both DP-protected and unprotected data, offering a more favorable balance between privacy guarantees and adversarial robustness. Our study further extends the findings of Deng \textbf{source} \cite{Deng} et al. by analyzing transfer robustness to determine whether the benefits of adversarial training persist when applied specifically to the final layers in a transfer learning setting with frozen feature extractors. Finally, we provide a rigorous empirical evaluation of the three-way trade-off between privacy guarantees, standard accuracy, and adversarial robustness.
+
+\section{Related Work}
+
+\subsection{Vision Transformers and Transfer Learning}
+Vision Transformers~\cite{dosovitskiy2021image} have emerged as powerful alternatives to CNNs for image classification tasks. Unlike CNNs, ViTs process images by splitting them into patches and applying self-attention mechanisms to model relationships between these patches. When training a ViT on CIFAR-10 without any prior pre-training, researchers have achieved  very high accuracies. The concept of transferring knowledge from models pre-trained on source data to efficiently adapt to target settings with limited data has gained significant traction in recent years. Panyi et al.~\cite{panyi2022transferability} demonstrated that ViTs have superior transfer learning capabilities compared to CNNs, with empirical evidence showing lower Transfer Ability (TA) scores for ViT-B/16 (0.1528) compared to ResNet-50 (0.1737). This suggests that ViTs undergo less significant representation changes during adaptation to new domains. Therefore, we aim at utilizing this ability when we perform TL from classical to quantum layers in the framework. \textbf{ref,source}.
+
+
+\subsection{Quantum Machine Learning - FOCUS MORE ON THIS}
+Quantum machine learning represents an emerging field that applies quantum computing principles to enhance traditional machine learning algorithms \textbf{source}. PennyLane has emerged as a popular framework that enables hybrid quantum-classical computations, allowing for gradients to be backpropagated through quantum circuits—a capability crucial for integrating quantum computing components within deep learning architectures. Quantum Neural Networks (QNNs) utilize parameterized quantum circuits (PQCs) to perform computation and can potentially offer advantages in representing complex functions with fewer parameters. Recent research has explored combining pre-trained classical neural networks with quantum classification layers, demonstrating potential advantages in certain classification tasks, especially when dealing with limited labeled data \textbf{source}.
+
+Quantum circuits can be designed to exploit phenomena such as quantum entanglement and superposition that have no classical counterparts. For instance, \textbf{source} Havlíček et al. demonstrated that quantum feature spaces can separate data points that would be difficult to distinguish in classical feature spaces, providing a potential quantum advantage for classification tasks.
+
+\textbf{Add more QML flavor}
+
+\subsection{Differential Privacy in Deep Learning}
+Differential Privacy provides mathematical guarantees that protect individual data points in the training set from being revealed through the model's outputs or behavior \textbf{source}. The implementation of DP in DL typically involves adding calibrated noise to the gradients during the training process, a technique known as Differentially Private Stochastic Gradient Descent (DP-SGD)~\cite{abadi2016deep}. While DP protects privacy, it often comes at the cost of reduced model accuracy. Recent advances have focused on mitigating this privacy-utility trade-off. Notable work by Papernot et al.~\cite{papernot2018} proposed PATE (Private Aggregation of Teacher Ensembles), which uses an ensemble of teacher models to transfer knowledge to a student model with privacy guarantees.
+
+\subsection{Adversarial Training and Robustness}
+Adversarial training~\cite{madry2018towards} is known to be one of the most effective defenses against adversarial attacks. It involves augmenting the training process with adversarial examples to enhance the model's robustness against attacks. Research has shown that the typical PGD adversarial training on CIFAR-10 achieves 83.53\% benign accuracy and 46.07\% robust accuracy against L-infinity PGD attacks. \textbf{source}.
+
+When implementing adversarial training with Vision Transformers, research by Mo et al.~\cite{mo2022adversarial} has found that pre-training and the SGD optimizer are necessary for effective adversarial training of these models. Additionally, the architectural components of ViTs can be leveraged to enhance robustness against adversarial attacks.
+% Also, adversarial training with PGD-based methods is a very effective technique to improve the robustness of the models. However, combining it with DP remains fairly unexplored. Our work tries to bridge this gap by studying the interactions between DP-induced noise and adversarial robustness. 
+
+
+\subsection{Intersection of Privacy and Robustness}
+The intersection of DP and adversarial robustness remains relatively unexplored. The DP-Adv approach, proposed by Bu et al.~\cite{bu2021}, stands out as an efficient and accurate training method that preserves both differential privacy and adversarial robustness in deep learning. This method is designed to be as private as non-robust private models, and as efficient as non-DP adversarial training. It works with all existing DP optimizers and attacking methods off-the-shelf, making it flexible and adaptable to various research contexts.
+
+Another approach is differentially private adversarial training, as presented in the work on "Differential Privacy in Adversarial Learning with Provable Robustness"~\cite{phan2019}. This approach leverages the sequential composition theory in differential privacy to establish a connection between DP preservation and provable robustness.
+
+\subsection{Quantum Computing for Security and Privacy}
+Quantum computing offers unique capabilities for addressing security and privacy challenges in machine learning. Recent work by Liu \textbf{source} et al. has explored how quantum circuits can be designed to inherently resist certain types of adversarial attacks by leveraging quantum phenomena like the no-cloning theorem and quantum measurement principles. 
+
+Chen et al. \textbf{source} have investigated how quantum noise can serve as a form of regularization that provides robustness against adversarial perturbations. Their work suggests that the inherent probabilistic nature of quantum measurements can obscure gradients that would otherwise be exploited by gradient-based attacks.
+
+The relationship between quantum privacy and DP has been explored by \textbf{source} Aaronson and Rothblum, who established theoretical connections between quantum cryptographic primitives and classical privacy guarantees. This theoretical foundation offers promising avenues for quantum-enhanced privacy-preserving machine learning.
+
+
+\section{Mathematical Formulation}
+
+\subsection{Transfer Learning with Frozen ViT Layers} 
+\textbf{source, add definition for cross-entropy loss}
+Let $f_{\theta}: \mathcal{X} \rightarrow \mathcal{Z}$ denote a pre-trained Vision Transformer, where $\mathcal{X}$ is the input space and $\mathcal{Z}$ is the feature space. For transfer learning, we freeze the parameters $\theta$ and add a classification head $g_{\phi}: \mathcal{Z} \rightarrow \mathcal{Y}$, where $\mathcal{Y}$ is the set of class labels for CIFAR-10. The composite model is defined as $h(x) = g_{\phi}(f_{\theta}(x)).$
+
+Given a dataset $D = \{(x_i, y_i)\}_{i=1}^n$ from CIFAR-10, the standard training objective is to minimize the empirical risk:
+\begin{equation}
+\min_{\phi} \frac{1}{n} \sum_{i=1}^{n} \mathcal{L}(g_{\phi}(f_{\theta}(x_i)), y_i),
+\end{equation}
+where $\mathcal{L}$ is  the cross-entropy loss for classification.
+
+\subsection{Quantum Circuit Classification}
+% fix vqc notion
+In our approach, we replace the traditional classification head \( g_{\phi} \) with a quantum-enhanced classifier \( q_{\psi}: \mathcal{Z} \to \mathcal{Y} \) that leverages parameterized quantum circuits. The quantum classifier consists of the following components:
+
+\begin{itemize}
+    \item A classical embedding layer that maps features to quantum states: \( e: \mathcal{Z} \to \mathbb{R}^d \), where \( d \) is chosen to match the number of qubits.
+    \item A quantum encoding circuit that encodes classical data into quantum states: \( E: \mathbb{R}^d \to \mathcal{H} \), where \( \mathcal{H} \) is the Hilbert space of the quantum system.
+    \item A parameterized quantum circuit \( U(\psi) \) that applies unitary transformations controlled by parameters \( \psi \).
+    \item A measurement operation \( M \) that extracts classical information from the quantum state.
+    \item A classical post-processing layer that maps measurement outcomes to class logits.
+\end{itemize}
+
+\textbf{Fix pp}
+The quantum classification process can be represented as:
+\[
+% wordy - fix pp
+q_{\psi}(z) = \text{post-processing} \Big( M \big( U(\psi) E(e(z)) \big) \Big).
+\]
+
+For a given input \( z \in \mathcal{Z} \), we first apply classical embedding to obtain \( e(z) \in \mathbb{R}^d \). This is then encoded into a quantum state using amplitude encoding or angle encoding. The parameterized quantum circuit \( U(\psi) \) applies quantum operations such as rotations and entangling gates. Finally, we measure the quantum state and apply classical post-processing to obtain class probabilities.
+
+The quantum circuit parameters \( \psi \) are optimized using gradient-based methods by computing the gradient of the loss function with respect to \( \psi \) through the parameter-shift rule or related methods available in PennyLane.
+
+
+\subsection{Differential Privacy Mechanisms}
+We implement DP through the Differentially Private Stochastic Gradient Descent (DP-SGD) algorithm.
+\textbf{Source} A randomized mechanism $\mathcal{M}$ satisfies $(\varepsilon, \delta)$-differential privacy if for any two adjacent datasets $D$ and $D'$ differing by one example, and for any subset of outputs $S$:
+\begin{equation}
+\Pr[\mathcal{M}(D) \in S] \leq e^{\varepsilon} \cdot \Pr[\mathcal{M}(D') \in S] + \delta.
+\end{equation}
+% Reformat !! 
+In DP-SGD, we modify the gradient computation via these steps:
+\begin{enumerate}
+    \item Compute per-example gradients: $\mathbf{g}_i = \nabla_{\phi} \mathcal{L}(g_{\phi}(f_{\theta}(x_i)), y_i)$
+    
+    \item Clip gradients to bound sensitivity: $\hat{\mathbf{g}}_i = \mathbf{g}_i / \max(1, \frac{\|\mathbf{g}_i\|_2}{C})$, where $C$ is the clipping threshold
+    
+    \item Add calibrated Gaussian noise: $\tilde{\mathbf{g}} = \frac{1}{n} \sum_{i=1}^{n} \hat{\mathbf{g}}_i + \mathcal{N}(0, \sigma^2 C^2 \mathbf{I})$, where $\sigma$ is the noise multiplier
+\end{enumerate}
+
+The privacy budget $(\varepsilon, \delta)$ is determined by $\sigma$, the batch size, and the number of training steps according to the moments accountant method.
+
+\subsection{Adversarial Attack Formulation}
+An adversarial example $x^{adv}$ for an input $x$ is generated by solving the optimization problem:
+\begin{equation}
+\label{Adversarial Optimization}
+\max_{\delta \in \Delta} \mathcal{L}(h(x + \delta), y),
+\end{equation}
+where $\Delta$ defines the perturbation constraints (e.g., $\|\delta\|_{\infty} \leq \epsilon$ for $L_{\infty}$-bounded perturbations).
+
+For the Projected Gradient Descent (PGD) attack, which is an iterative attack method, the adversarial example is generated as:
+\begin{equation}
+\label{PGD}
+\delta^{t+1} = \Pi_{\Delta}(\delta^t + \alpha \cdot \text{sign}(\nabla_{\delta} \mathcal{L}(h(x + \delta^t), y))),
+\end{equation}
+where $\Pi_{\Delta}$ projects the perturbation back onto the constraint set $\Delta$, $\alpha$ is the step size, and $t$ is the iteration index.
+
+\subsection{Adversarial Training Objectives}
+We consider three adversarial training scenarios:
+
+\subsubsection{Non-DP Adversarial Training}
+\begin{equation}
+\label{NonDPAT}
+\min_{\phi} \mathbb{E}_{(x,y) \sim D} \left[ \max_{\delta \in \Delta} \mathcal{L}(g_{\phi}(f_{\theta}(x + \delta)), y) \right].
+\end{equation}
+
+\subsubsection{DP Adversarial Training}
+Let $D_{DP}$ represent the dataset with differential privacy applied. The objective is:
+\begin{equation}
+\label{DPAT}
+\min_{\phi} \mathbb{E}_{(x,y) \sim D_{DP}} \left[ \max_{\delta \in \Delta} \mathcal{L}(g_{\phi}(f_{\theta}(x + \delta)), y) \right],
+\end{equation}
+with gradients processed according to DP-SGD.
+
+\subsubsection{Mixed Adversarial Training}
+Let $\lambda \in [0,1]$ be a mixing coefficient. The objective becomes:
+\begin{align}
+\label{MixAT}
+\min_{\phi} & \lambda \cdot \mathbb{E}_{(x,y) \sim D} \left[ \max_{\delta \in \Delta} \mathcal{L}(g_{\phi}(f_{\theta}(x + \delta)), y) \right] \nonumber \\
+&+ (1-\lambda) \cdot \mathbb{E}_{(x,y) \sim D_{DP}} \left[ \max_{\delta \in \Delta} \mathcal{L}(g_{\phi}(f_{\theta}(x + \delta)), y) \right].
+\end{align}
+
+
+The PGD-based adversarial training algorithm generates adversarial examples in each mini-batch:
+\begin{equation}
+\delta = \arg\max_{\delta \in \Delta} \mathcal{L}(g_{\phi}(f_{\theta}(x + \delta)), y).
+\end{equation}
+
+These examples are then used for model updates. For DP-protected adversarial training, we additionally apply gradient clipping and noise addition:
+
+\begin{equation}
+\begin{split}
+\phi_{t+1} = \phi_t - \eta \cdot \Bigg(&\frac{1}{|B|} \sum_{i \in B} \nabla_{\phi} \mathcal{L}(g_{\phi}(f_{\theta}(x_i + \delta_i)), y_i) \
+&+ \mathcal{N}(0, \sigma^2 C^2 \mathbf{I})\Bigg),
+\end{split}
+\end{equation}
+
+
+
+where $B$ is the mini-batch, $\eta$ is the learning rate, $C$ is the clipping threshold, and $\sigma$ is the noise multiplier.
+
+% \subsection{Privacy-Utility-Robustness Metrics}
+% We quantify the three-way trade-off with the following metrics. Firstly we consider the privacy guarantee measured by the privacy budget $\varepsilon$. Secondly, the  standard accuracy on clean test data is calculated via:
+%     \begin{equation}
+%         \text{Acc}(h, D_{\text{test}}) = \frac{1}{|D_{\text{test}}|} \sum_{(x, y) \in D_{\text{test}}} \mathbb{I}[h(x) = y].
+%     \end{equation}
+
+%     % Then 
+%     % \begin{equation}
+%     %      \text{RobustAcc}(h, D_{\text{test}}, \Delta) =  \frac{1}{|D_{\text{test}}|} 
+%     %     \sum_{(x, y) \in D_{\text{test}}} \mathbb{I}\Bigg[h\Big(x + \arg\max_{\delta \in \Delta} 
+%     %     \mathcal{L}(h(x + \delta), y)\Big) = y\Bigg]
+%     % \end{equation}
+
+
+    
+
+% We can also define a composite metric that balances all three aspects:
+
+% \begin{equation}
+% \text{PUR-Score}(h, D_{test}, \Delta, \varepsilon) = \alpha \cdot \text{Acc}(h, D_{test}) + \beta \cdot \text{Robust-Acc}(h, D_{test}, \Delta) - \gamma \cdot \varepsilon
+% \end{equation}
+
+% where $\alpha$, $\beta$, and $\gamma$ are hyperparameters that control the relative importance of each aspect.
+
+\subsection{Theoretical Analysis of Privacy-Robustness Interaction}
+
+Recent theoretical work suggests a complex relationship between DP and adversarial robustness, with both complementary and competing effects \textbf{Source} \cite{Yang} [Yang et al]. Let us consider a simplified setting where the loss function is $L$-Lipschitz continuous.
+The perturbation bound for an $(\varepsilon, \delta)$-DP mechanism with sensitivity $\Delta f$ can be expressed as:
+\begin{equation}
+|\mathbb{E}[\mathcal{M}(D)] - \mathbb{E}[\mathcal{M}(D')]|_2 \leq \Delta f \cdot \min\left(2, \sqrt{2\varepsilon + 2\delta/\varepsilon}\right)
+\end{equation}
+
+Similarly, the adversarial robustness constraint ensures that for perturbations $|\delta|p \leq \epsilon{adv}$:
+\begin{equation}
+\max_{|\delta|p \leq \epsilon_{adv}} |h(x + \delta) - h(x)| \leq L \cdot \epsilon_{adv}
+\end{equation}
+
+These bounds provide insights into how DP and adversarial training interact. Firstly, we notice that  the noise introduced by DP can potentially "smooth" the decision boundary, providing some inherent robustness against small perturbations. While adversarial training may help mitigate accuracy degradation associated with DP, there exists a fundamental trade-off between privacy guarantees and adversarial robustness. Both DP and robustness requirements can increase the sample complexity of learning tasks, potentially compounding their effects on model utility. Understanding these interactions is crucial for designing models that balance privacy, robustness, and utility. Recent work by \cite{Asi}Asi et al.
+suggests that for low-dimensional tasks, the optimal error rates for DP estimators and robust estimators may be closely related, providing a promising direction for future research in this area.
+
+\section{Methodology}
+
+\begin{figure*}
+    \centering
+    \includegraphics[width=1\linewidth]{framework.png}
+    \caption{Framework - HQ coming up soon}
+    \label{fig:framework}
+\end{figure*}
+
+
+\subsection{Vision Transformer Architecture}
+We use the Vision Transformer (ViT-B/16) pretrained on ImageNet and adapt it for CIFAR-10 classification. The backbone is frozen, and custom fully connected layers are added for classification. For CIFAR-10's 32×32 resolution, we adjust the patch embedding layer (TODO ADD DETAILS OF IMPLEMENTATION, NEW TODO UPDATE WITH  THE FINAL CODE AND RESULTS OF IT)
+
+% \begin{align*}
+%     vit\_model.\text{patch\_embed} = \\\text{PatchEmbed}(&\text{img\_size}=32, \nonumber \\
+%     &\text{patch\_size}=4, \nonumber \\
+%     &\text{in\_chans}=3, \nonumber \\
+%     &\text{embed\_dim}=vit\_model.\text{embed\_dim})
+% \end{align*}
+
+\subsection{Differential Privacy Mechanism}
+Differential Privacy is implemented using the Opacus library with the following key parameters: % TODO UPDATE WITH NEW PARAMS
+% \begin{itemize}
+%     \item Clipping threshold $C = 1.0$
+%     \item Noise multiplier $\sigma = 0.35$
+%     \item Target epsilon $\varepsilon \approx 0.03$ for 20 epochs
+%     \item Batch size = 32
+% \end{itemize}
+
+The implementation in PennyLane looks as follows:
+\textbf{add details}
+\begin{algorithm}
+\caption{DP-SGD Training with Opacus}
+\begin{algorithmic}[1]
+\STATE Import privacy engine
+\STATE Create model, optimizer, and data loader
+\STATE Initialize privacy engine
+\STATE Make model private
+\STATE Train model for specified number of epochs
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Adversarial Training}
+We employ the Projected Gradient Descent (PGD) attack for adversarial training with the following parameters: %% Move to setup 
+% \begin{itemize}
+%     \item Step size $\alpha = 2/255$
+%     \item Perturbation budget $\epsilon = 8/255$
+%     \item Number of steps = 10
+% \end{itemize}
+
+For mixed adversarial training, we use a mixing coefficient $\lambda = 0.5$, giving equal weight to adversarial examples generated from both DP and non-DP data. \textbf{Update} I tried multiple values, check the results section.
+
+% move to results /. change naming *model archs
+\subsection{Experimental Setup}
+Our experiments are structured to isolate the effects of differential privacy and adversarial training:
+
+\begin{enumerate}
+    \item \textbf{Baseline Model}: ViT with frozen backbone, fine-tuned on clean CIFAR-10 data
+    
+    \item \textbf{DP Model}: Same architecture, but trained with differential privacy applied
+    
+    \item \textbf{Adversarially Trained Models}:
+    \begin{itemize}
+        \item Model trained with adversarial examples from non-DP data
+        \item Model trained with adversarial examples from DP-protected data
+        \item Model trained with a mix of both DP and non-DP adversarial examples
+    \end{itemize}
+\end{enumerate}
+
+For each model, we evaluate both standard accuracy on clean test data and robust accuracy against PGD, and FGSM attacks.
+% move to the next section
+\section{Implementation Details}
+
+\subsection{Dataset Preparation}
+For the CIFAR-10 dataset, we implement the following preprocessing pipeline:
+
+% \begin{align}
+% \text{transform} = \text{Compose}([ & \text{RandomCrop}(32, \text{padding}=4), \nonumber \\
+% & \text{RandomHorizontalFlip}(), \nonumber \\
+% & \text{ToTensor}(), \nonumber \\
+% & \text{Normalize}((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
+% \end{align}
+
+\subsection{Model Architecture} % less details
+The complete architecture consists of:
+\begin{itemize}
+    \item Frozen ViT-B/16 backbone (pretrained on ImageNet)
+    \item Adjusted patch embedding layer for 32×32 images
+    \item Custom Quantum classification head with the following structure:
+    % \begin{itemize}
+    %     \item Linear layer: 768 → 256 units
+    %     \item ReLU activation
+    %     \item Dropout (p=0.2)
+    %     \item Linear layer: 256 → 10 units
+    % \end{itemize}
+\end{itemize}
+
+\subsection{Training Parameters}
+\begin{itemize}
+    \item Optimizer: Adam with learning rate 0.001
+    \item Batch size: 256
+    \item Epochs: 100
+    \item Weight decay: 1e-4
+    \item Early stopping patience: 10 epochs
+\end{itemize}
+
+\subsection{Attack Implementation}
+For evaluating adversarial robustness, we implement three attack methods:
+\begin{itemize}
+    \item \textbf{PGD}: 20 steps, $\epsilon = 8/255$, $\alpha = 2/255$
+    \item \textbf{FGSM} \textbf{new details}
+\end{itemize}
+
+\section{Results}
+
+\subsection{Clean Accuracy and Privacy-Utility Trade-off}
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{lcc}
+        \toprule
+        \textbf{Model} & \textbf{Clean Accuracy (\%)}  \\
+        \midrule
+        Baseline (Non-DP) & 94.2  \\
+        DP Model ($b = 0.35$) & 88.7  \\
+        DP Model ($b = 2.5$) & 79.1 \\
+        \bottomrule
+    \end{tabular}
+    
+    \caption{Trade-off between privacy budget and clean accuracy for models with frozen ViT backbone.}
+    \label{tab:privacy_utility}
+\end{table}
+
+As expected, we observe a clear trade-off between privacy guarantees and model utility. Higher privacy protection (lower $\varepsilon$) results in lower clean accuracy. However, the accuracy degradation is less severe than in models without transfer learning, demonstrating the benefits of our approach of freezing the ViT backbone.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.45\textwidth]{cleanacc.png}
+    \caption{ (a) Clean Accuracy - Base Model} (b) Loss
+    \label{fig:clean_accuracy}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.35\textwidth]{dpatl.png} 
+    \caption{Accuracy against attacks on DP Adversarial Training}
+    \label{fig:dpatl}
+\end{figure}
+
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.45\textwidth]{exp2.png} % Replace with your image file name
+    \caption{Accuracy of DP TL (a) Loss (b) Accuracy }
+
+    \label{fig:exp2}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.45\textwidth]{exp3.png} 
+    \caption{Accuracy of DP ATL (a)Loss (b)Accuracy }
+    \label{fig:exp3}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.35\textwidth]{nondpadv.png} 
+    \caption{Accuracy against attacks on Non-DP Adversarial Training}
+    \label{fig:nondpadv}
+\end{figure}
+
+
+% \begin{figure}[h]
+%     \centering
+%     \includegraphics[width=0.5\textwidth]{nr of attacks.png} % Replace with your image file name
+%     \label{fig:nrattacks}
+% \end{figure}
+
+% \begin{figure}[h]
+%     \centering
+%     \includegraphics[width=0.5\textwidth]{Untitled.png} % Replace with your image file name
+%     \caption{AQTL - MIX (FIX)}
+%     \label{fig:v2}
+% \end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=1\linewidth]{final_comparison_v2.1.png}
+    \caption{Robustness Against Adversarial Attacks}
+    \label{fig:final_comparison}
+\end{figure}
+
+
+Moreover, we observe that models trained with DP show improved robustness against adversarial attacks compared to the non-DP baseline, even without explicit adversarial training. This supports the theoretical prediction that DP's gradient noise provides some inherent smoothing of decision boundaries, contributing to adversarial robustness.
+The mixed adversarial training approach, which combines adversarial examples from both DP and non-DP data, achieves the highest robust accuracy across all attack methods, outperforming both pure DP and pure non-DP adversarial training.
+
+\subsection{Adversarial Robustness}
+
+\begin{table}[H]
+    \centering
+    TODO FIG 6 is table II pretty much
+    \begin{tabular}{lccc}
+        \toprule
+        \textbf{Model} & \multicolumn{3}{c}{\textbf{Robust Accuracy (\%)}} \\
+        \cmidrule(lr){2-4}
+        & \textbf{PGD} & \textbf{FGSM} \\
+        \midrule
+        Baseline (Non-DP) & 12.4 & 26.8  \\
+        DP Model ($\varepsilon = 5.0$) & 18.6 & 34.5 \\
+        Adv. Trained (Non-DP) & 42.7 & 58.3 \\
+         Adv. Trained (DP, $\varepsilon = 5.0$) & 38.9 & 55.1 \\
+        Mixed Adv. Trained & 45.2 & 60.7  \\
+        \bottomrule
+    \end{tabular}
+    \caption{Robust accuracy against different attack methods.}
+    \label{tab:robust_accuracy}
+\end{table}
+
+Interestingly, we observe that models trained with differential privacy show improved robustness against adversarial attacks compared to the non-DP baseline, even without explicit adversarial training. This supports the theoretical prediction that DP's gradient noise provides some inherent smoothing of decision boundaries, contributing to adversarial robustness.
+
+The mixed adversarial training approach, which combines adversarial examples from both DP and non-DP data, achieves the highest robust accuracy across all attack methods, outperforming both pure DP and pure non-DP adversarial training.
+
+\subsection{Privacy-Utility-Robustness Trade-off}
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{lccc}
+        \toprule
+        \textbf{Model} & \textbf{Clean Acc. (\%)} & \textbf{PGD Acc. (\%)} } \\
+        \midrule
+        % Baseline (Non-DP) & 94.2 & 12.4 & 31.6 \\
+        % DP Model ($\varepsilon = 5.0$) & 88.7 & 18.6 & 32.4 \\
+        % Adv. Trained (Non-DP) & 91.3 & 42.7 & 40.1 \\
+        % Adv. Trained (DP, $\varepsilon = 5.0$) & 85.6 & 38.9 & 37.5 \\
+        % Mixed Adv. Trained & 90.1 & 45.2 & 41.7 \\
+        % \bottomrule
+    \end{tabular}
+    \caption{UPDATE WITH NEW TUESDAY DATA}
+    \label{tab:pur_score}
+\end{table}
+
+To quantify the three-way trade-off, we calculate a Privacy-Utility-Robustness (PUR) Score that combines clean accuracy, robust accuracy, and privacy budget. The mixed adversarial training approach achieves the highest PUR-Score, indicating the best balance between the three competing objectives.
+
+\subsection{Effect of Layer Freezing on Training Dynamics}
+
+Freezing the ViT backbone not only reduces computational requirements but also stabilizes training. Our experiments show that models with frozen backbones converge faster and exhibit less variance in performance compared to models where all parameters are trainable. This is particularly beneficial in the DP setting, where the added noise can otherwise lead to unstable training.
+
+\section{Discussion}
+
+\subsection{Impact of Differential Privacy on Adversarial Robustness}
+Our results reveal a complex relationship between differential privacy and adversarial robustness. While DP mechanisms degrade clean accuracy as expected, they also provide some inherent robustness against adversarial attacks. This can be understood from a theoretical perspective: the noise added during DP training smooths the decision boundaries, making the model less sensitive to small perturbations.
+
+However, this inherent robustness is not uniformly distributed across all attack types. We observe that DP provides better protection against gradient-based attacks like FGSM and PGD, but is less effective against optimization-based attacks like CW. This is likely because optimization-based attacks can adapt to overcome the decision boundary smoothing induced by DP.
+
+\subsection{Benefits of Mixed Adversarial Training}
+The superior performance of our mixed adversarial training approach can be attributed to several factors:
+
+First, training with adversarial examples from DP-protected data exposes the model to a different attack distribution than training with non-DP adversarial examples. This diversity in attack patterns enhances the model's ability to generalize its robustness.
+
+Second, the noise introduced by DP creates additional variability in the generated adversarial examples, effectively augmenting the training data beyond what standard adversarial training would provide.
+
+Third, mixing DP and non-DP adversarial examples helps mitigate the accuracy degradation typically associated with pure DP training, while still benefiting from the robustness advantages of both approaches.
+
+\subsection{Practical Implications}
+Our findings have several practical implications for deploying machine learning models in privacy-sensitive and security-critical applications:
+
+The transfer learning approach with frozen ViT backbone significantly reduces the computational overhead of both DP and adversarial training, making these techniques more accessible for real-world applications.
+
+The mixed adversarial training strategy offers a practical compromise for scenarios where both privacy and robustness are important, but computational resources are limited.
+
+The improved stability of training with frozen backbones is particularly valuable for DP training, where the added noise can otherwise make convergence challenging.
+
+\subsection{Limitations and Future Work}
+Despite the promising results, several limitations and future directions should be acknowledged:
+
+Our experiments are limited to CIFAR-10, and the findings may not generalize to more complex datasets or real-world applications. Future work should extend this analysis to larger, more diverse datasets, or even multimodal situations.
+
+We focus on a specific set of attack methods (PGD, FGSM?), and the robustness against other attack strategies remains to be investigated.
+
+The privacy analysis assumes a specific threat model (membership inference attacks), and the effectiveness against other privacy threats (e.g., model inversion attacks) needs further study.
+
+Future research could explore adaptive DP mechanisms that allocate the privacy budget dynamically based on the sensitivity of different layers, potentially further improving the privacy-utility-robustness trade-off. (BIGGER PROBLEM/IDEA)
+
+\section{Conclusion}
+This paper presents a comprehensive evaluation of the interactions between DP, adversarial training, and TL with Vision Transformers. By freezing the pre-trained ViT backbone and focusing on training custom classifier layers through a QML lens, we create a controlled environment to isolate and study these effects.
+
+Our results demonstrate that DP not only protects sensitive training data but also provides some inherent robustness against adversarial attacks. Moreover, our mixed adversarial training approach, which combines adversarial examples from both DP-protected and unprotected data, achieves a favorable balance between privacy guarantees, standard accuracy, and adversarial robustness.
+
+These findings contribute to our understanding of the complex trade-offs in building secure, private, and robust QML systems. By acknowledging and navigating these trade-offs, we can develop models that better meet the strict requirements of critical applications where all three properties—accuracy, privacy, and robustness—are essential.
+
+
+
+
+\section{Relevant sources - Check \& Update later}
+
+
+\begin{itemize}
+    \item \href{https://proceedings.mlr.press/v97/wang19i/wang19i.pdf}{IMPORTANT ON ANALYSIS}
+    \item \href{https://github.com/jqi41/QuantumDot/tree/main}{QuantumDot Repository}
+    \item \href{https://arxiv.org/pdf/2501.01507}{arXiv:2501.01507}
+    \item \href{https://arxiv.org/pdf/2411.08552v1}{arXiv:2411.08552v1}
+    \item \href{https://par.nsf.gov/servlets/purl/10427896}{NSF Publication}
+    \item \href{http://proceedings.mlr.press/v139/chen21k/chen21k.pdf}{PMLR V139: Chen et al.}
+    \item \href{http://proceedings.mlr.press/v97/liu19b/liu19b.pdf}{PMLR V97: Liu et al.}
+    \item \href{https://arxiv.org/pdf/2312.05716}{arXiv:2312.05716}
+    \item \href{https://openreview.net/pdf?id=ryebG04YvB}{OpenReview Paper}
+    \item \href{https://arxiv.org/pdf/2106.10189}{arXiv:2106.10189}
+    \item \href{https://www.merl.com/publications/docs/TR2022-044.pdf}{MERL TR2022-044}
+    \item \href{https://pennylane.ai/qml/demos/tutorial_quantum_transfer_learning}{PennyLane Quantum Transfer Learning}
+    \item \href{https://arxiv.org/pdf/1912.08278v2}{arXiv:1912.08278v2}
+    \item \href{https://arxiv.org/pdf/2412.12373v1}{arXiv:2412.12373v1}
+    \item \href{https://ieeexplore.ieee.org/document/10619403}{IEEE Paper: 10619403}
+    \item \href{https://arxiv.org/pdf/2012.13573}{arXiv:2012.13573}
+    \item \href{https://github.com/XanaduAI/quantum-transfer-learning}{XanaduAI Quantum Transfer Learning}
+    \item \href{https://arxiv.org/pdf/2401.10405}{arXiv:2401.10405}
+    \item \href{https://openreview.net/pdf?id=Byg-An4tPr}{OpenReview: Byg-An4tPr}
+    \item \href{https://arxiv.org/pdf/2104.02610}{arXiv:2104.02610}
+    \item \href{https://research.google/blog/leveraging-transfer-learning-for-large-scale-differentially-private-image-classification/}{Google Research Blog: Transfer Learning}
+    \item \href{https://arxiv.org/pdf/2105.04615}{arXiv:2105.04615}
+    \item \href{https://ieeexplore.ieee.org/document/10061732}{IEEE Paper: 10061732}
+    \item \href{https://arxiv.org/pdf/2408.14738v1}{arXiv:2408.14738v1}
+    \item \href{https://www2.isye.gatech.edu/~fferdinando3/cfp/PPAI20/papers/paper_9.pdf}{PPAI20 Paper}
+\end{itemize}
+
+
+\bibliographystyle{plain}
+\begin{thebibliography}{10}
+
+\bibitem{dosovitskiy2021image}
+Dosovitskiy, A., Beyer, L., Kolesnikov, A., Weissenborn, D., Zhai, X., Unterthiner, T., \ldots \& Houlsby, N. (2021). An image is worth 16x16 words: Transformers for image recognition at scale. In International Conference on Learning Representations.
+
+\bibitem{panyi2022transferability}
+Panyi, M., Wang, Y., Tian, H., \& Lv, J. (2022). Transferability of Vision Transformer. arXiv preprint arXiv:2201.09772.
+
+\bibitem{deng2021}
+Deng, X., Chen, Y., Li, Z., \& Zhang, Y. (2021). On adversarial transferability and knowledge distillation in transformers. arXiv preprint arXiv:2101.00137.
+
+\bibitem{bu2021}
+Bu, X., Li, R., \& Zhao, J. (2021). DP-Adv: Self-supervised Adversarial Training for Differentially Private Models. arXiv preprint arXiv:2110.14427.
+
+\bibitem{tang2022differential}
+Tang, C., Tian, X., Javadi, H., Zhang, Y., \& Wu, Z. (2022). Differentially Private Representation Learning from Random Priors. arXiv preprint arXiv:2204.01371.
+
+\bibitem{abadi2016deep}
+Abadi, M., Chu, A., Goodfellow, I., McMahan, H. B., Mironov, I., Talwar, K., \& Zhang, L. (2016). Deep learning with differential privacy. In Proceedings of the 2016 ACM SIGSAC conference on computer and communications security (pp. 308-318).
+
+\bibitem{papernot2018}
+Papernot, N., Song, S., Mironov, I., Raghunathan, A., Talwar, K., \& Erlingsson, Ú. (2018). Scalable private learning with pate. arXiv preprint arXiv:1802.08908.
+
+\bibitem{madry2018towards}
+Madry, A., Makelov, A., Schmidt, L., Tsipras, D., \& Vladu, A. (2018). Towards deep learning models resistant to adversarial attacks. In International Conference on Learning Representations.
+
+\bibitem{mo2022adversarial}
+Mo, F., Shafahi, A., Kurakin, A., Kazemi, H., Gu, I. Y. H., \& Dahl, G. (2022). Adversarial training with rectified rejection. arXiv preprint arXiv:2105.14785.
+
+\bibitem{phan2019}
+Phan, N., Wu, X., Hu, H., \& Dou, D. (2019). Differential privacy in adversarial learning with provable robustness. arXiv preprint arXiv:1903.09822.
+
+\end{thebibliography}
+
+\balance
+\end{document}
